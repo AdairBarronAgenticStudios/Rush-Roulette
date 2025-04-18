@@ -1,3 +1,9 @@
+// Game Constants
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 8;
+const ROUNDS_PER_GAME = 3;
+const ROUND_DURATION = 60000; // 60 seconds
+
 import { getRandomItem } from './src/ai/items.js';
 import ImageHasher from './src/security/imageHash.js';
 import AudioManager from './src/audio/audioManager.js';
@@ -173,6 +179,13 @@ const gameState = {
     scanner: new ItemScanner(),
     imageHasher: new ImageHasher(),
     audio: new AudioManager(),
+    isConnecting: false,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 5,
+    reconnectDelay: 1000,
+    lastConnectionError: null,
+    isScanning: false,
+    loadingStates: new Map(),
     playerStats: {
         roundScores: [],
         roundTimes: [],
@@ -238,119 +251,239 @@ function handleAntiCheatWarning(warning) {
     }
 }
 
-// Initialize socket connection
+// Initialize socket connection with reconnection logic
 function initializeSocket() {
+    if (gameState.isConnecting) return;
+    
     console.log('Initializing socket connection...');
+    gameState.isConnecting = true;
+    updateLoadingState('connection', true, 'Connecting to server...');
+    
     try {
-        gameState.socket = io();
+        gameState.socket = io({
+            reconnection: true,
+            reconnectionAttempts: gameState.maxReconnectAttempts,
+            reconnectionDelay: gameState.reconnectDelay
+        });
         
         // Socket event handlers
         gameState.socket.on('connect', () => {
             console.log('Connected to server');
-            startGameButton.disabled = false; // Enable button once connected
-        });
-
-        gameState.socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-            showError('Unable to connect to game server. Please try again.');
-        });
-
-        gameState.socket.on('playerJoined', (data) => {
-            console.log('Player joined:', data);
-            updatePlayerList(data);
-        });
-
-        gameState.socket.on('playerLeft', (data) => {
-            removePlayer(data.playerId);
-        });
-
-        gameState.socket.on('gameStarted', (data) => {
-            startGame(data);
-        });
-
-        gameState.socket.on('countdown', (count) => {
-            updateCountdown(count);
-        });
-
-        gameState.socket.on('roundStarted', (data) => {
-            startRound(data);
-        });
-
-        gameState.socket.on('itemVerified', (data) => {
-            updatePlayerScore(data);
-        });
-
-        gameState.socket.on('itemRejected', (data) => {
-            showError(data.message);
-        });
-
-        gameState.socket.on('roundEnded', (data) => {
-            endRound(data);
-        });
-
-        gameState.socket.on('gameEnded', (data) => {
-            endGame(data);
-        });
-
-        gameState.socket.on('submissionRejected', (data) => {
-            if (data.level) {
-                // Anti-cheat warning
-                handleAntiCheatWarning(data);
-            } else {
-                // Regular rejection
-                showError(data.reason);
+            gameState.isConnecting = false;
+            gameState.reconnectAttempts = 0;
+            gameState.lastConnectionError = null;
+            updateLoadingState('connection', false);
+            startGameButton.disabled = false;
+            
+            // Attempt to rejoin if we were in a game
+            if (gameState.isGameActive) {
+                attemptRejoin();
             }
         });
-
-        gameState.socket.on('kicked', (data) => {
-            showScreen('error-screen');
-            const errorMessage = document.createElement('div');
-            errorMessage.className = 'error-message';
-            errorMessage.innerHTML = `
-                <h2>You have been removed from the game</h2>
-                <p>Reason: ${data.reason}</p>
-                <button onclick="location.reload()">Return to Home</button>
-            `;
-            document.getElementById('error-screen').appendChild(errorMessage);
+        
+        gameState.socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+            gameState.lastConnectionError = error;
+            updateLoadingState('connection', true, 'Connection error. Retrying...');
+            startGameButton.disabled = true;
         });
+        
+        gameState.socket.on('disconnect', (reason) => {
+            console.log('Disconnected:', reason);
+            gameState.isConnecting = false;
+            updateLoadingState('connection', true, 'Disconnected. Attempting to reconnect...');
+            startGameButton.disabled = true;
+            
+            if (reason === 'io server disconnect') {
+                // Server disconnected us, try to reconnect
+                gameState.socket.connect();
+            }
+        });
+        
+        gameState.socket.on('error', handleError);
+        
+        // Game event handlers
+        setupGameEventHandlers();
+        
     } catch (error) {
-        console.error('Failed to initialize socket:', error);
-        showError('Failed to connect to game server. Please refresh the page.');
+        console.error('Socket initialization error:', error);
+        gameState.isConnecting = false;
+        gameState.lastConnectionError = error;
+        updateLoadingState('connection', false);
+        showError('Failed to connect to server. Please refresh the page.');
     }
+}
+
+// Handle errors
+function handleError(error) {
+    console.error('Received error:', error);
+    
+    switch (error.type) {
+        case 'rate_limit':
+            showError(`${error.message} Please wait ${Math.ceil(error.resetTime / 1000)} seconds.`);
+            break;
+        case 'invalid_input':
+            showError(error.message);
+            break;
+        case 'submission_locked':
+            showError('Please wait before submitting again.');
+            break;
+        case 'room_creation_failed':
+            showError('Unable to create game room. Please try again.');
+            break;
+        case 'already_joined':
+            showError('You are already in a game.');
+            break;
+        default:
+            showError('An error occurred. Please try again.');
+    }
+}
+
+// Update loading states
+function updateLoadingState(key, isLoading, message = '') {
+    gameState.loadingStates.set(key, { isLoading, message });
+    updateLoadingUI();
+}
+
+// Update loading UI
+function updateLoadingUI() {
+    const loadingContainer = document.getElementById('loading-container') || createLoadingContainer();
+    loadingContainer.innerHTML = '';
+    
+    let hasActiveLoading = false;
+    gameState.loadingStates.forEach(({ isLoading, message }, key) => {
+        if (isLoading) {
+            hasActiveLoading = true;
+            const loadingElement = document.createElement('div');
+            loadingElement.className = 'loading-item';
+            loadingElement.innerHTML = `
+                <div class="loading-spinner"></div>
+                <span class="loading-message">${message}</span>
+            `;
+            loadingContainer.appendChild(loadingElement);
+        }
+    });
+    
+    loadingContainer.style.display = hasActiveLoading ? 'flex' : 'none';
+}
+
+// Create loading container
+function createLoadingContainer() {
+    const container = document.createElement('div');
+    container.id = 'loading-container';
+    container.className = 'loading-container';
+    document.body.appendChild(container);
+    return container;
 }
 
 // Initialize audio system
 async function initializeAudio() {
-    await gameState.audio.initialize();
-    
-    // Create and add volume control
-    const volumeControl = new VolumeControl(gameState.audio);
-    document.body.appendChild(volumeControl.create());
+    try {
+        await gameState.audio.initialize();
+        
+        // Create and add volume control
+        const volumeControl = new VolumeControl(gameState.audio);
+        document.body.appendChild(volumeControl.create());
+    } catch (error) {
+        console.warn('Audio initialization failed:', error);
+        // Continue without audio
+        gameState.audio = {
+            playSound: () => {}, // No-op function
+            playSequence: () => {},
+            startMusic: () => {},
+            stopMusic: () => {}
+        };
+    }
 }
 
 // Game Functions
 async function startGame(data) {
-    console.log('Game started!');
-    showScreen('game-screen');
-    gameState.isGameActive = true;
-    gameState.currentRound = data.round;
-    gameState.targetItem = data.targetItem;
-    
-    // Play game start sounds
-    gameState.audio.playSequence([
-        { sound: 'roundStart', options: { volume: 0.7 } },
-        { sound: 'countdown', delay: 500 }
-    ]);
-    
-    // Start background music
-    gameState.audio.startMusic();
-    
-    // Initialize AI scanner
-    await gameState.scanner.initialize();
-    
-    // Update UI
-    currentRoundDisplay.textContent = gameState.currentRound;
-    targetItemDisplay.textContent = gameState.targetItem;
+    try {
+        console.log('Game started!');
+        showScreen('game-screen');
+        gameState.isGameActive = true;
+        gameState.currentRound = data.round;
+        gameState.targetItem = data.targetItem;
+        
+        // Play game start sounds
+        if (gameState.audio) {
+            gameState.audio.playSequence([
+                { sound: 'roundStart', options: { volume: 0.7 } },
+                { sound: 'countdown', delay: 500 }
+            ]);
+            
+            // Start background music
+            gameState.audio.startMusic();
+        }
+        
+        // Initialize AI scanner
+        await gameState.scanner.initialize();
+        
+        // Update UI with null checks
+        const currentRoundDisplay = document.getElementById('current-round');
+        const targetItemDisplay = document.getElementById('target-item');
+        
+        if (currentRoundDisplay) {
+            currentRoundDisplay.textContent = gameState.currentRound;
+        } else {
+            console.warn('Current round display element not found');
+        }
+        
+        if (targetItemDisplay) {
+            targetItemDisplay.textContent = gameState.targetItem;
+        } else {
+            console.warn('Target item display element not found');
+        }
+        
+        // Initialize game UI
+        initializeGameUI();
+    } catch (error) {
+        console.error('Error starting game:', error);
+        showError('Failed to start game. Please refresh the page.');
+    }
+}
+
+function initializeGameUI() {
+    try {
+        // Create game UI elements if they don't exist
+        const gameScreen = document.getElementById('game-screen');
+        if (!gameScreen) {
+            console.warn('Game screen element not found');
+            return;
+        }
+        
+        // Ensure required elements exist
+        ['current-round', 'target-item', 'countdown'].forEach(id => {
+            if (!document.getElementById(id)) {
+                const element = document.createElement('div');
+                element.id = id;
+                element.className = id;
+                gameScreen.appendChild(element);
+            }
+        });
+        
+        // Initialize player slots
+        const playerContainer = document.getElementById('player-container') || createPlayerContainer();
+        if (!playerContainer.hasChildNodes()) {
+            for (let i = 0; i < gameState.maxPlayers; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'player-slot empty';
+                slot.dataset.position = i;
+                slot.innerHTML = '<span>Waiting for player...</span>';
+                playerContainer.appendChild(slot);
+            }
+        }
+    } catch (error) {
+        console.error('Error initializing game UI:', error);
+    }
+}
+
+function createPlayerContainer() {
+    const container = document.createElement('div');
+    container.id = 'player-container';
+    container.className = 'player-container';
+    document.getElementById('game-screen').appendChild(container);
+    return container;
 }
 
 function startRound(data) {
@@ -440,6 +573,8 @@ function updateCountdown(count) {
 }
 
 function updatePlayerList(data) {
+    console.log('Updating player list:', data);
+    
     // Find an empty player slot
     const emptySlot = document.querySelector('.player-video.empty');
     if (!emptySlot) {
@@ -451,7 +586,13 @@ function updatePlayerList(data) {
     emptySlot.classList.remove('empty');
     emptySlot.innerHTML = `
         <video autoplay playsinline></video>
-        <div class="player-name">${data.playerName}</div>
+        <div class="player-info">
+            <div class="player-name">${data.playerName}</div>
+            <div class="player-stats">
+                <span class="score">0</span>
+                <span class="streak"></span>
+            </div>
+        </div>
     `;
 
     // Store player data
@@ -461,6 +602,11 @@ function updatePlayerList(data) {
         name: data.playerName,
         element: emptySlot
     };
+
+    // Show waiting message if not enough players
+    if (data.currentPlayers.length < MIN_PLAYERS) {
+        showMessage(`Waiting for players... (${data.currentPlayers.length}/${MIN_PLAYERS} needed)`);
+    }
 }
 
 function removePlayer(playerId) {
@@ -747,18 +893,19 @@ if (startGameButton) {
     console.error('Start game button not found in the DOM');
 }
 
-// Add event listener for play again button
+// Update the play again button handler
 document.getElementById('play-again').addEventListener('click', () => {
-    // Reset game state
-    gameState.playerStats = {
-        roundScores: [],
-        roundTimes: [],
-        maxStreak: 0,
-        currentStreak: 0
-    };
-    
-    // Emit join game event
-    gameState.socket.emit('joinGame', { name: gameState.playerName });
+    // Don't reset game state, just prompt for a new player name
+    const playerName = prompt('Enter player name:');
+    if (playerName && playerName.trim()) {
+        console.log('Adding new player:', playerName);
+        gameState.socket.emit('joinGame', { name: playerName });
+        
+        // Play click sound
+        if (gameState.audio) {
+            gameState.audio.playSound('click');
+        }
+    }
 });
 
 // Initialize the game
@@ -776,4 +923,82 @@ async function init() {
 }
 
 // Start the game when the page loads
-document.addEventListener('DOMContentLoaded', init); 
+document.addEventListener('DOMContentLoaded', init);
+
+// Setup game event handlers
+function setupGameEventHandlers() {
+    gameState.socket.on('playerJoined', (data) => {
+        console.log('Player joined:', data);
+        updatePlayerList(data);
+        
+        // Show waiting message if not enough players
+        if (data.currentPlayers.length < MIN_PLAYERS) {
+            showMessage(`Waiting for players... (${data.currentPlayers.length}/${MIN_PLAYERS} needed)`);
+        }
+    });
+
+    gameState.socket.on('gameStarting', (data) => {
+        console.log('Game starting:', data);
+        showScreen('game-screen');
+        updateCountdown(data.countdown);
+    });
+
+    gameState.socket.on('countdown', (data) => {
+        console.log('Countdown:', data);
+        updateCountdown(data.countdown);
+    });
+
+    gameState.socket.on('gameStarted', (data) => {
+        console.log('Game started:', data);
+        startGame(data);
+    });
+
+    gameState.socket.on('roundStarted', (data) => {
+        console.log('Round started:', data);
+        startRound(data);
+    });
+
+    gameState.socket.on('itemVerified', (data) => {
+        console.log('Item verified:', data);
+        updatePlayerScore(data);
+    });
+
+    gameState.socket.on('roundEnded', (data) => {
+        console.log('Round ended:', data);
+        endRound(data);
+    });
+
+    gameState.socket.on('gameEnded', (data) => {
+        console.log('Game ended:', data);
+        endGame(data);
+    });
+
+    gameState.socket.on('playerLeft', (data) => {
+        console.log('Player left:', data);
+        removePlayer(data.playerId);
+    });
+
+    gameState.socket.on('playerRejoined', (data) => {
+        console.log('Player rejoined:', data);
+        updatePlayerList(data);
+    });
+}
+
+// Add helper function to show messages
+function showMessage(message) {
+    const messageContainer = document.getElementById('message-container') || createMessageContainer();
+    messageContainer.textContent = message;
+    messageContainer.classList.add('show');
+    
+    setTimeout(() => {
+        messageContainer.classList.remove('show');
+    }, 3000);
+}
+
+function createMessageContainer() {
+    const container = document.createElement('div');
+    container.id = 'message-container';
+    container.className = 'message-container';
+    document.body.appendChild(container);
+    return container;
+} 

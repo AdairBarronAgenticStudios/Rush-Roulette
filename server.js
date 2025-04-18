@@ -43,11 +43,35 @@ const MAX_PLAYERS = 8;
 const MIN_PLAYERS = 2;
 const ROUNDS_PER_GAME = 3;
 const DIFFICULTIES = ['common', 'specific', 'rare'];
+const ROOM_CLEANUP_INTERVAL = 300000; // 5 minutes
+const PLAYER_TIMEOUT = 30000; // 30 seconds
+const MAX_INACTIVE_TIME = 600000; // 10 minutes
 
 // Game state
 const gameRooms = new Map();
 const playerRooms = new Map();
-const disconnectedPlayers = new Map(); // Track disconnected players for recovery
+const disconnectedPlayers = new Map();
+const submissionLocks = new Map(); // Prevent duplicate submissions
+
+// Clean up inactive rooms and disconnected players
+setInterval(() => {
+    const now = Date.now();
+    
+    // Clean up inactive rooms
+    for (const [roomId, room] of gameRooms.entries()) {
+        if (!room.isActive && (now - room.lastActivity > MAX_INACTIVE_TIME)) {
+            endGame(roomId, 'Room inactive');
+            gameRooms.delete(roomId);
+        }
+    }
+    
+    // Clean up disconnected players
+    for (const [playerId, data] of disconnectedPlayers.entries()) {
+        if (now - data.timestamp > PLAYER_TIMEOUT) {
+            disconnectedPlayers.delete(playerId);
+        }
+    }
+}, ROOM_CLEANUP_INTERVAL);
 
 // Express routes
 app.get('/status', (req, res) => {
@@ -75,46 +99,98 @@ const checkRateLimit = (socket, actionType) => {
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Handle player joining
-    socket.on('joinGame', (data) => {
-        if (!checkRateLimit(socket, 'roomJoin')) return;
+    // Clean up any existing session for this socket
+    cleanupPlayer(socket.id);
 
-        console.log('Player joining game:', data.name);
-        const playerName = data.name;
-        
-        // Find an available room or create a new one
-        let roomId = findAvailableRoom();
-        if (!roomId) {
-            roomId = createNewRoom();
+    // Handle player joining with validation
+    socket.on('joinGame', (data) => {
+        if (!checkRateLimit(socket, 'roomJoin')) {
+            socket.emit('error', {
+                type: 'rate_limit',
+                message: 'Too many join attempts. Please wait.'
+            });
+            return;
         }
         
-        // Add player to room
-        socket.join(roomId);
-        playerRooms.set(socket.id, roomId);
+        // Validate player name
+        if (!validatePlayerName(data.name)) {
+            socket.emit('error', {
+                type: 'invalid_input',
+                message: 'Invalid player name. Must be 2-20 characters.'
+            });
+            return;
+        }
         
-        const room = gameRooms.get(roomId);
-        room.players.push({
-            id: socket.id,
-            name: playerName,
-            score: 0,
-            streak: 0,
-            roundScores: []
-        });
-        
-        // Notify all players in the room
-        io.to(roomId).emit('playerJoined', {
-            playerId: socket.id,
-            playerName: playerName,
-            currentPlayers: room.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                score: p.score
-            }))
-        });
-        
-        // Start game if room has minimum players
-        if (room.players.length >= MIN_PLAYERS) {
-            startGameCountdown(roomId);
+        try {
+            console.log('Player joining game:', data.name);
+            const playerName = data.name.trim();
+            
+            // Find or create room
+            let roomId = findAvailableRoom();
+            if (!roomId) {
+                try {
+                    roomId = createNewRoom();
+                } catch (error) {
+                    socket.emit('error', {
+                        type: 'room_creation_failed',
+                        message: 'Failed to create game room.'
+                    });
+                    return;
+                }
+            }
+            
+            const room = gameRooms.get(roomId);
+            
+            // Check if room is full
+            if (room.players.length >= MAX_PLAYERS) {
+                socket.emit('error', {
+                    type: 'room_full',
+                    message: 'Room is full. Please try again later.'
+                });
+                return;
+            }
+            
+            // Add player to room
+            socket.join(roomId);
+            playerRooms.set(socket.id, roomId);
+            
+            const playerData = {
+                id: socket.id,
+                name: playerName,
+                score: 0,
+                streak: 0,
+                roundScores: [],
+                lastActivity: Date.now()
+            };
+            
+            room.players.push(playerData);
+            room.lastActivity = Date.now();
+            
+            // Notify all players
+            io.to(roomId).emit('playerJoined', {
+                playerId: socket.id,
+                playerName: playerName,
+                currentPlayers: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    score: p.score,
+                    streak: p.streak
+                }))
+            });
+            
+            // Start game if enough players
+            if (room.players.length >= MIN_PLAYERS && !room.isActive) {
+                console.log('Starting game countdown...');
+                startGameCountdown(roomId);
+            } else {
+                console.log(`Waiting for more players (${room.players.length}/${MIN_PLAYERS} needed)`);
+            }
+        } catch (error) {
+            console.error('Error in joinGame:', error);
+            socket.emit('error', {
+                type: 'join_failed',
+                message: 'Failed to join game.'
+            });
         }
     });
 
@@ -172,81 +248,89 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Handle item submissions
+    // Handle item submissions with locking
     socket.on('submitItem', async (data) => {
         if (!checkRateLimit(socket, 'itemSubmission')) return;
-
+        
         const roomId = playerRooms.get(socket.id);
         if (!roomId) return;
-
+        
         const room = gameRooms.get(roomId);
         if (!room || !room.isActive) return;
-
+        
         const player = room.players.find(p => p.id === socket.id);
         if (!player) return;
-
-        // Calculate score based on time and accuracy
-        const timeElapsed = Date.now() - room.roundStartTime;
-        const timeBonus = Math.max(0, 1 - (timeElapsed / ROUND_DURATION));
-        const score = calculateScore(timeBonus, room.currentRound, player.streak);
-
-        // Update player score
-        player.score += score;
-        player.streak++;
-        player.roundScores[room.currentRound - 1] = score;
-
-        // Notify all players
-        io.to(roomId).emit('itemVerified', {
-            playerId: socket.id,
-            playerName: player.name,
-            score: score,
-            totalScore: player.score,
-            streak: player.streak
-        });
+        
+        // Check submission lock
+        const lockKey = `${roomId}:${socket.id}`;
+        if (submissionLocks.has(lockKey)) {
+            socket.emit('error', {
+                type: 'submission_locked',
+                message: 'Please wait before submitting again.'
+            });
+            return;
+        }
+        
+        try {
+            // Lock submission
+            submissionLocks.set(lockKey, true);
+            
+            // Validate submission data
+            if (!data || !data.prediction || !data.confidence) {
+                throw new Error('Invalid submission data');
+            }
+            
+            // Calculate score
+            const timeElapsed = Date.now() - room.roundStartTime;
+            const timeBonus = Math.max(0, 1 - (timeElapsed / ROUND_DURATION));
+            const score = calculateScore(timeBonus, room.currentRound, player.streak);
+            
+            // Update player score
+            player.score += score;
+            player.streak++;
+            player.roundScores[room.currentRound - 1] = score;
+            player.lastActivity = Date.now();
+            room.lastActivity = Date.now();
+            
+            // Notify all players
+            io.to(roomId).emit('itemVerified', {
+                playerId: socket.id,
+                playerName: player.name,
+                score: score,
+                totalScore: player.score,
+                streak: player.streak,
+                timeBonus: timeBonus
+            });
+            
+            // Release lock after a short delay
+            setTimeout(() => {
+                submissionLocks.delete(lockKey);
+            }, 1000);
+        } catch (error) {
+            console.error('Error in submitItem:', error);
+            socket.emit('error', {
+                type: 'submission_failed',
+                message: 'Failed to process item submission.'
+            });
+            submissionLocks.delete(lockKey);
+        }
     });
 
     // Handle disconnections
     socket.on('disconnect', () => {
+        console.log('Player disconnected:', socket.id);
         const roomId = playerRooms.get(socket.id);
         if (roomId) {
             const room = gameRooms.get(roomId);
             if (room) {
-                // Store disconnected player data for potential recovery
-                const player = room.players.find(p => p.id === socket.id);
-                if (player) {
-                    disconnectedPlayers.set(socket.id, {
-                        roomId,
-                        playerData: player,
-                        timestamp: Date.now()
-                    });
-
-                    // Set cleanup timeout
-                    setTimeout(() => {
-                        disconnectedPlayers.delete(socket.id);
-                    }, 30000); // 30 second recovery window
-                }
-
-                room.players = room.players.filter(p => p.id !== socket.id);
-                io.to(roomId).emit('playerLeft', { 
+                // Notify other players before cleanup
+                io.to(roomId).emit('playerLeft', {
                     playerId: socket.id,
-                    remainingPlayers: room.players.length
+                    remainingPlayers: room.players.length - 1
                 });
-                
-                // End game if not enough players
-                if (room.players.length < MIN_PLAYERS && room.isActive) {
-                    endGame(roomId, 'Not enough players');
-                }
-                
-                // Clean up empty rooms
-                if (room.players.length === 0) {
-                    gameRooms.delete(roomId);
-                }
             }
-            playerRooms.delete(socket.id);
         }
-
-        // Clean up rate limiter data
-        rateLimiter.clearUser(socket.id);
+        cleanupPlayer(socket.id);
     });
 });
 
@@ -259,7 +343,8 @@ function createNewRoom() {
         isActive: false,
         roundStartTime: null,
         targetItem: null,
-        roundTimer: null
+        roundTimer: null,
+        lastActivity: Date.now()
     });
     return roomId;
 }
@@ -424,6 +509,46 @@ function calculateScore(timeBonus, round, streak) {
 setInterval(() => {
     rateLimiter.cleanup();
 }, 60000); // Every minute
+
+// Validate player name
+function validatePlayerName(name) {
+    if (!name || typeof name !== 'string') return false;
+    const trimmedName = name.trim();
+    return trimmedName.length >= 2 && trimmedName.length <= 20;
+}
+
+// Update cleanupPlayer function
+function cleanupPlayer(socketId) {
+    console.log('Cleaning up player:', socketId);
+    
+    // Remove from player rooms
+    const roomId = playerRooms.get(socketId);
+    playerRooms.delete(socketId);
+    
+    // Remove from rate limiter
+    rateLimiter.clearUser(socketId);
+    
+    // Remove from disconnected players
+    disconnectedPlayers.delete(socketId);
+    
+    // Remove from room if exists
+    if (roomId) {
+        const room = gameRooms.get(roomId);
+        if (room) {
+            // Remove player from room
+            room.players = room.players.filter(p => p.id !== socketId);
+            
+            // Clean up empty rooms
+            if (room.players.length === 0) {
+                console.log('Removing empty room:', roomId);
+                gameRooms.delete(roomId);
+            } else if (room.players.length < MIN_PLAYERS && room.isActive) {
+                // End game if not enough players
+                endGame(roomId, 'Not enough players');
+            }
+        }
+    }
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

@@ -240,23 +240,75 @@ main {
 
 .player-slot {
     position: relative;
-    aspect-ratio: 16/9;
-    border-radius: 10px;
+    width: 200px;
+    height: 150px;
+    margin: 10px;
+    border-radius: 8px;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease;
-}
-
-.player-slot:hover {
-    transform: scale(1.02);
+    background: rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
 }
 
 .player-slot.empty {
-    border: 2px dashed #323232;
+    background: transparent;
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    display: none; /* Hide empty slots by default */
+}
+
+.player-slot.empty span {
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 14px;
+}
+
+.player-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.game-screen {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    color: #666;
+    justify-content: center;
+    min-height: 100vh;
+    background: #1a1a1a;
+    color: white;
+    padding: 20px;
+}
+
+/* Only show occupied slots */
+.player-slot:not(.empty) {
+    display: block;
+}
+
+/* Center the webcam feed */
+.camera-container {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+#webcam {
+    width: 100%;
+    max-width: 640px;
+    border-radius: 12px;
+    margin: 20px auto;
+}
+
+/* Target item display */
+#target-item {
+    font-size: 24px;
+    margin: 20px 0;
+    padding: 15px 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    text-align: center;
 }
 
 .player-video {
@@ -1068,4 +1120,81 @@ footer {
 .item-to-find:hover,
 .player-entry:hover {
     animation: darkNeonPulse 2s infinite;
+}
+
+.loading-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.loading-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    animation: slideIn 0.3s ease-out;
+}
+
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-message {
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Message Container */
+.message-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    text-align: center;
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.message-container.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
 } 
