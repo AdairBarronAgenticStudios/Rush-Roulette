@@ -104,27 +104,43 @@ main {
 }
 
 .home-screen h1 {
-    font-size: 2.5rem;
+    font-size: 4rem;
     margin-bottom: 2rem;
-    color: #fff;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    color: #ff1744;
+    text-shadow: 
+        0 0 7px #ff1744,
+        0 0 10px #ff1744,
+        0 0 21px #ff1744,
+        0 0 42px #ff1744;
+    text-align: center;
+}
+
+.home-screen .game-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
 }
 
 .home-screen .input-container {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    align-items: center;
+    gap: 1.5rem;
     width: 100%;
     max-width: 300px;
 }
 
 .home-screen input {
+    width: 100%;
     padding: 0.75rem 1rem;
     border-radius: 5px;
     border: 1px solid #323232;
     background: rgba(255, 255, 255, 0.1);
     color: #fff;
     font-size: 1rem;
+    text-align: center;
     transition: all 0.2s ease;
 }
 
@@ -136,25 +152,35 @@ main {
 }
 
 .home-screen button {
-    padding: 0.75rem 1.5rem;
+    padding: 1rem 2.5rem;
     border-radius: 5px;
     border: none;
     background: #4CAF50;
     color: #fff;
-    font-size: 1rem;
+    font-size: 1.4rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    margin-bottom: 1rem;
 }
 
 .home-screen button:hover {
     background: #45a049;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
 }
 
 .home-screen button:active {
     transform: translateY(0);
     box-shadow: none;
+}
+
+.home-screen .welcome-message {
+    text-align: center;
+    color: #888;
+    font-size: 1.2rem;
+    max-width: 500px;
+    line-height: 1.6;
+    margin-top: 1rem;
 }
 
 /* Game Screen Specific Styles */
