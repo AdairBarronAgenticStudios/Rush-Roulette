@@ -8,12 +8,13 @@
 }
 
 body {
-    font-family: 'Arial', sans-serif;
-    line-height: 1.6;
-    background-color: #0a0a0a;
+    font-family: 'Roboto', sans-serif;
+    background-color: #121212;
     color: #fff;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Header styles */
@@ -66,6 +67,11 @@ main {
 /* Screen Transitions */
 .screen {
     display: none;
+    width: 100%;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
     opacity: 0;
     transform: translateY(20px);
 }
@@ -75,132 +81,194 @@ main {
     animation: fadeIn 0.5s ease-out forwards;
 }
 
-/* Home Screen Styles */
-.game-description {
-    margin: 1rem 0;
-    font-size: 1.2rem;
-    color: #666;
+/* Home Screen Specific Styles */
+.home-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+    z-index: 10;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-/* Game Screen Styles */
+.home-screen.hidden {
+    opacity: 0;
+    transform: scale(1.1);
+    pointer-events: none;
+}
+
+.home-screen h1 {
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}
+
+.home-screen .input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    max-width: 300px;
+}
+
+.home-screen input {
+    padding: 0.75rem 1rem;
+    border-radius: 5px;
+    border: 1px solid #323232;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.home-screen input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+.home-screen button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 5px;
+    border: none;
+    background: #4CAF50;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.home-screen button:hover {
+    background: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.home-screen button:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+/* Game Screen Specific Styles */
+.game-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: #1a1a1a;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 5;
+}
+
+.game-screen.active {
+    opacity: 1;
+    transform: scale(1);
+}
+
 .game-content {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
     gap: 0.5rem;
-    height: 96%;
-    width: 100%;
-    margin: 0 auto;
-    background: rgba(20, 20, 20, 0.8);
-    border-radius: 15px;
+    height: 100vh;
     padding: 0.5rem;
-    border: 1px solid #383838;
+    overflow: hidden;
 }
 
 .item-to-find {
     grid-column: 2;
     grid-row: 2;
-    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-    padding: 0.5rem;
-    border-radius: 10px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.2));
+    border-radius: 15px;
+    padding: 1rem;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
     text-align: center;
-    z-index: 2;
-    box-shadow: 0 0 10px rgba(32, 32, 32, 0.5), 0 0 20px rgba(32, 32, 32, 0.3);
-    height: 100%;
-    border: 1px solid #323232;
 }
 
-.item-to-find h3 {
+.item-to-find h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #4CAF50;
+}
+
+.item-to-find p {
     font-size: 1rem;
-    margin-bottom: 0.25rem;
-    color: #42dcff;
+    color: #888;
+    margin: 0;
 }
 
-.item-display {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #fff;
-    text-shadow: 0 0 10px rgba(66, 220, 255, 0.5);
-}
-
-.player-video {
+.player-slot {
     position: relative;
-    width: 100%;
-    height: 100%;
-    background-color: #000;
+    aspect-ratio: 16/9;
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 0 10px rgba(32, 32, 32, 0.3);
-    border: 1px solid #2a2a2a;
-    transition: all 0.3s ease;
+    background: rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease;
 }
 
-.player-video:hover {
-    box-shadow: 
-        0 0 10px rgba(32, 32, 32, 0.5),
-        0 0 20px rgba(32, 32, 32, 0.3),
-        0 0 30px rgba(32, 32, 32, 0.2);
-    border-color: #323232;
+.player-slot:hover {
     transform: scale(1.02);
 }
 
-.player-video video {
+.player-slot.empty {
+    border: 2px dashed #323232;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #666;
+}
+
+.player-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.player-video .player-name {
+.player-info {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     padding: 0.5rem;
     background: rgba(0, 0, 0, 0.7);
-    color: #323232;
-    text-align: center;
-    font-size: 0.8rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    text-shadow: 
-        0 0 5px rgba(32, 32, 32, 0.7),
-        0 0 10px rgba(32, 32, 32, 0.5);
 }
 
-.player-video .player-stats {
+.player-name {
+    color: #fff;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.player-stats {
     display: flex;
-    align-items: center;
     gap: 0.5rem;
     font-size: 0.8rem;
 }
 
-.player-video .score {
+.player-score {
     color: #4CAF50;
 }
 
-.player-video .streak {
-    color: #FF9800;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.player-video.empty {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(20, 20, 20, 0.8);
-    border: 1px dashed #383838;
-}
-
-.player-video.empty span {
-    color: #666;
-    font-size: 0.8rem;
+.player-streak {
+    color: #FFC107;
 }
 
 /* Camera Container */
