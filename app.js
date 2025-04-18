@@ -440,26 +440,52 @@ function updateCountdown(count) {
 }
 
 function updatePlayerList(data) {
-    const playerEntry = document.createElement('div');
-    playerEntry.className = 'player-entry';
-    playerEntry.id = `player-${data.playerId}`;
-    playerEntry.innerHTML = `
-        <span>${data.playerName}</span>
-        <span>0 points</span>
+    // Find an empty player slot
+    const emptySlot = document.querySelector('.player-video.empty');
+    if (!emptySlot) {
+        console.warn('No empty slots available for new player');
+        return;
+    }
+
+    // Remove empty class and update content
+    emptySlot.classList.remove('empty');
+    emptySlot.innerHTML = `
+        <video autoplay playsinline></video>
+        <div class="player-name">${data.playerName}</div>
     `;
-    playerList.appendChild(playerEntry);
+
+    // Store player data
+    const position = emptySlot.dataset.position;
+    gameState.players[position] = {
+        id: data.playerId,
+        name: data.playerName,
+        element: emptySlot
+    };
 }
 
 function removePlayer(playerId) {
-    const playerElement = document.getElementById(`player-${playerId}`);
-    if (playerElement) {
-        playerElement.remove();
+    // Find the player's position
+    const position = Object.keys(gameState.players).find(pos => 
+        gameState.players[pos] && gameState.players[pos].id === playerId
+    );
+
+    if (position) {
+        const playerElement = gameState.players[position].element;
+        playerElement.classList.add('empty');
+        playerElement.innerHTML = '<span>Waiting for player...</span>';
+        delete gameState.players[position];
     }
 }
 
 function updatePlayerScore(data) {
-    const playerElement = document.getElementById(`player-${data.playerId}`);
-    if (playerElement) {
+    // Find the player's position
+    const position = Object.keys(gameState.players).find(pos => 
+        gameState.players[pos] && gameState.players[pos].id === data.playerId
+    );
+
+    if (position) {
+        const playerElement = gameState.players[position].element;
+        
         // Play score sounds
         if (data.score.total > 150) {
             gameState.audio.playSound('streak', { volume: 0.7 });
@@ -473,12 +499,13 @@ function updatePlayerScore(data) {
         scoreIncrement.textContent = `+${data.score.total}`;
         playerElement.appendChild(scoreIncrement);
 
-        // Update player entry with score and streak
-        playerElement.innerHTML = `
-            <span class="player-name">${data.playerName}</span>
+        // Update player name with score and streak
+        const playerNameElement = playerElement.querySelector('.player-name');
+        playerNameElement.innerHTML = `
+            ${data.playerName}
             <div class="player-stats">
-                <span class="score">${data.totalScore} points</span>
-                ${data.streak > 1 ? `<span class="streak">🔥 ${data.streak}x</span>` : ''}
+                <span class="score">${data.totalScore}</span>
+                ${data.streak > 1 ? `<span class="streak">🔥${data.streak}x</span>` : ''}
             </div>
         `;
 
