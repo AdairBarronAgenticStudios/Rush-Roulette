@@ -228,7 +228,7 @@ main {
     margin: 0;
 }
 
-.player-slot {
+.player-video {
     position: relative;
     width: 200px;
     height: 150px;
@@ -237,15 +237,21 @@ main {
     overflow: hidden;
     background: rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
+    border: 2px solid #FFFFFF;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.player-slot.empty {
+.player-video.empty {
     background: transparent;
-    border: 2px dashed rgba(255, 255, 255, 0.1);
-    display: none; /* Hide empty slots by default */
+    border: 2px solid #FFFFFF;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.player-slot.empty span {
+.player-video.empty span {
     color: rgba(255, 255, 255, 0.3);
     font-size: 14px;
 }
@@ -271,7 +277,7 @@ main {
 }
 
 /* Only show occupied slots */
-.player-slot:not(.empty) {
+.player-video:not(.empty) {
     display: block;
 }
 
