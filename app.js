@@ -21,8 +21,8 @@ class ItemScanner {
             'spoon': ['spoon', 'utensil', 'silverware', 'cutlery', 'tableware'],
             'scissors': ['scissors', 'shears', 'clippers', 'cutting tool', 'blade'],
             'rubiks cube': ['cube', 'puzzle', 'rubix', 'toy', 'puzzle cube'],
-            'water bottle': ['bottle', 'container', 'water', 'drink', 'plastic bottle'],
-            'book': ['book', 'novel', 'text', 'publication', 'reading material', 'paperback', 'hardcover', 'literature']
+            'book': ['book', 'novel', 'text', 'publication', 'reading material', 'paperback', 'hardcover', 'literature'],
+            'cup': ['cup', 'mug', 'glass', 'drinking vessel', 'container']
         };
     }
 

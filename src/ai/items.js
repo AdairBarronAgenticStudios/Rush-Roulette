@@ -16,16 +16,6 @@ export const itemDatabase = {
             synonyms: ["novel", "textbook", "paperback", "hardcover", "reading material"]
         },
         {
-            name: "pen",
-            keywords: ["writing", "office", "stationery"],
-            synonyms: ["ballpoint", "ink pen", "writing instrument"]
-        },
-        {
-            name: "mechanical pencil",
-            keywords: ["writing", "office", "stationery", "drawing"],
-            synonyms: ["LED pencil", "automatic pencil", "clicking pencil", "drafting pencil"]
-        },
-        {
             name: "cup",
             keywords: ["drinking", "container", "mug"],
             synonyms: ["mug", "glass", "drinking vessel"]
@@ -41,49 +31,10 @@ export const itemDatabase = {
             name: "rubiks cube",
             keywords: ["puzzle", "toy", "cube", "game"],
             synonyms: ["cube puzzle", "rubix cube", "magic cube", "puzzle cube"]
-        },
-        {
-            name: "tape measure",
-            keywords: ["tool", "measurement", "length"],
-            synonyms: ["measuring tape", "ruler", "yardstick"]
-        },
-        {
-            name: "candle",
-            keywords: ["light", "wax", "flame"],
-            synonyms: ["tealight", "pillar", "wax candle"]
-        },
-        {
-            name: "remote control",
-            keywords: ["electronic", "TV", "device"],
-            synonyms: ["remote", "clicker", "TV remote"]
         }
     ],
     rare: [
-        {
-            name: "birthday card",
-            keywords: ["greeting", "paper", "celebration"],
-            synonyms: ["greeting card", "celebration card", "wishes card"]
-        },
-        {
-            name: "red screwdriver",
-            keywords: ["tool", "red", "hardware"],
-            synonyms: ["red-handled screwdriver", "crimson screwdriver"]
-        },
-        {
-            name: "specific book",
-            keywords: ["reading", "title", "author"],
-            synonyms: ["named book", "particular book"]
-        },
-        {
-            name: "blue toothbrush",
-            keywords: ["hygiene", "blue", "dental"],
-            synonyms: ["blue-handled toothbrush", "cyan toothbrush"]
-        },
-        {
-            name: "water bottle",
-            keywords: ["container", "drink", "beverage", "plastic"],
-            synonyms: ["bottle", "drinking bottle", "reusable bottle", "drink container"]
-        }
+        // This category is currently empty - will be populated with new items
     ]
 };
 
