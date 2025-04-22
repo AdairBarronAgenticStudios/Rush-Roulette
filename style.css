@@ -89,97 +89,128 @@ main {
 
 /* Home Screen Specific Styles */
 .home-screen {
-    /* Remove position, width, height, background, z-index, transition, opacity, transform */
-    /* These are now handled by .screen and .screen.active */
-    display: flex; /* Keep flex for centering content */
-    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    display: flex;
     justify-content: center;
     align-items: center;
+    background: #111;
+    z-index: 1000;
 }
 
-.home-screen.hidden {
-    /* Remove opacity, transform, pointer-events */
-    /* This class might no longer be needed if .screen/.active handles everything */
+.home-screen::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    height: 500px;
+    background: rgba(20, 20, 20, 0.95);
+    border-radius: 24px;
+    box-shadow: 0 0 40px rgba(255, 23, 68, 0.1);
 }
 
-.home-screen h1 {
-    font-size: 4rem;
-    margin-bottom: 2rem;
-    color: #ff1744;
-    text-shadow: 
-        0 0 7px #ff1744,
-        0 0 10px #ff1744,
-        0 0 21px #ff1744,
-        0 0 42px #ff1744;
+.home-screen .content-wrapper {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    width: 400px;
     text-align: center;
 }
 
-.home-screen .game-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 2rem;
+.home-screen h1 {
+    font-size: 3.5rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 0;
+    color: #ff1744;
+    text-shadow: 0 0 10px rgba(255, 23, 68, 0.8),
+                 0 0 20px rgba(255, 23, 68, 0.5),
+                 0 0 30px rgba(255, 23, 68, 0.3);
+    animation: neonPulse 1.5s ease-in-out infinite alternate;
+    line-height: 1.2;
 }
 
 .home-screen .input-container {
+    width: 100%;
     display: flex;
     flex-direction: column;
+    gap: 2rem;
     align-items: center;
-    gap: 1.5rem;
-    width: 100%;
-    max-width: 300px;
 }
 
 .home-screen input {
     width: 100%;
-    padding: 0.75rem 1rem;
-    border-radius: 5px;
-    border: 1px solid #323232;
-    background: rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.5rem;
+    font-size: 1.25rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
     color: #fff;
-    font-size: 1rem;
     text-align: center;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+}
+
+.home-screen input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .home-screen input:focus {
     outline: none;
-    border-color: #4CAF50;
-    background: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+    border-color: rgba(255, 23, 68, 0.4);
+    box-shadow: 0 0 20px rgba(255, 23, 68, 0.2);
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .home-screen button {
-    padding: 1rem 2.5rem;
-    border-radius: 5px;
-    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.5rem;
     background: #4CAF50;
-    color: #fff;
-    font-size: 1.4rem;
+    border: none;
+    border-radius: 12px;
+    color: white;
     cursor: pointer;
-    transition: all 0.2s ease;
-    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
 .home-screen button:hover {
-    background: #45a049;
+    background: #43A047;
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
 }
 
-.home-screen button:active {
-    transform: translateY(0);
-    box-shadow: none;
-}
-
-.home-screen .welcome-message {
+.home-screen p {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.6);
     text-align: center;
-    color: #888;
-    font-size: 1.2rem;
-    max-width: 500px;
     line-height: 1.6;
-    margin-top: 1rem;
+    margin: 0;
+}
+
+@keyframes neonPulse {
+    from {
+        text-shadow: 0 0 10px rgba(255, 23, 68, 0.8),
+                     0 0 20px rgba(255, 23, 68, 0.5),
+                     0 0 30px rgba(255, 23, 68, 0.3);
+    }
+    to {
+        text-shadow: 0 0 15px rgba(255, 23, 68, 0.9),
+                     0 0 25px rgba(255, 23, 68, 0.6),
+                     0 0 35px rgba(255, 23, 68, 0.4);
+    }
 }
 
 /* Game Screen Specific Styles */

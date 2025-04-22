@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rush Roulette</title>
+    <title>Rush Roulette - Game</title>
     <link rel="stylesheet" href="style.css">
     <!-- TensorFlow.js and MobileNet -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
@@ -11,7 +11,7 @@
     <!-- Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
     <!-- Main App -->
-    <script type="module" src="app.js"></script>
+    <script type="module" src="game.js"></script>
 </head>
 <body>
     <header>
@@ -20,20 +20,8 @@
 
     <main>
         <div id="game-container">
-            <!-- Home Screen -->
-            <div id="home-screen" class="home-screen screen active">
-                <div class="content-wrapper">
-                    <h1>Welcome to<br>Rush Roulette!</h1>
-                    <div class="input-container">
-                        <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" autocomplete="off">
-                        <button id="start-game">Play Now</button>
-                        <p>Race against other players to find items in your home! Be the fastest to locate objects and climb the leaderboard.</p>
-                    </div>
-                </div>
-            </div>
-
             <!-- Game Screen -->
-            <div id="game-screen" class="screen">
+            <div id="game-screen" class="screen active">
                 <div class="game-content">
                     <!-- Top row -->
                     <div class="player-video empty" data-position="0">
@@ -136,6 +124,7 @@
                     </div>
                 </div>
 
+                <button id="return-home" class="primary-button">Return to Home</button>
                 <button id="play-again" class="primary-button">Play Again</button>
             </div>
 
