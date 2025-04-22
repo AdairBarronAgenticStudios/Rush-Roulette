@@ -1223,9 +1223,11 @@ if (startGameButton) {
                 return;
             }
 
-            const playerName = prompt('Enter your name:');
-            if (playerName && playerName.trim()) {
-                gameState.playerName = playerName.trim();
+            const playerNameInput = document.getElementById('player-name');
+            const playerName = playerNameInput.value.trim();
+            
+            if (playerName) {
+                gameState.playerName = playerName;
                 console.log('Emitting joinGame event with name:', playerName);
                 gameState.socket.emit('joinGame', { name: playerName });
                 
@@ -1233,6 +1235,8 @@ if (startGameButton) {
                 if (gameState.audio) {
                     gameState.audio.playSound('click');
                 }
+            } else {
+                showError('Please enter your name');
             }
         } catch (error) {
             console.error('Error in start game handler:', error);
@@ -1245,9 +1249,10 @@ if (startGameButton) {
 
 // Update the play again button handler
 document.getElementById('play-again').addEventListener('click', () => {
-    // Don't reset game state, just prompt for a new player name
-    const playerName = prompt('Enter player name:');
-    if (playerName && playerName.trim()) {
+    const playerNameInput = document.getElementById('player-name');
+    const playerName = playerNameInput.value.trim();
+    
+    if (playerName) {
         console.log('Adding new player:', playerName);
         gameState.socket.emit('joinGame', { name: playerName });
         
@@ -1255,6 +1260,8 @@ document.getElementById('play-again').addEventListener('click', () => {
         if (gameState.audio) {
             gameState.audio.playSound('click');
         }
+    } else {
+        showError('Please enter your name');
     }
 });
 
