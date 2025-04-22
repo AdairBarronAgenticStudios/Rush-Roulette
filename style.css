@@ -233,27 +233,24 @@ main {
 
 .player-video {
     position: relative;
-    border-radius: 8px;
+    border-radius: 12px;
+    background-color: #1a1a1a;
     overflow: hidden;
-    background: rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
-    border: 2px solid #FFFFFF;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    min-height: 160px;
 }
 
 .player-video.empty {
-    background: transparent;
-    border: 2px solid #FFFFFF;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
 }
 
-.player-video.empty span {
-    color: rgba(255, 255, 255, 0.3);
-    font-size: 14px;
+.player-video video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .player-container {
@@ -285,16 +282,89 @@ main {
 .camera-container {
     position: relative;
     width: 100%;
-    max-width: 800px;
-    margin: 0 auto;
-    text-align: center;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-#webcam {
-    width: 100%;
-    max-width: 640px;
-    border-radius: 12px;
-    margin: 20px auto;
+.camera-container.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.camera-container.loading::before {
+    content: '';
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    z-index: 3;
+}
+
+/* Processing error message */
+.processing-error {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(255, 59, 48, 0.85);
+    color: white;
+    padding: 8px;
+    text-align: center;
+    font-size: 14px;
+    z-index: 3;
+}
+
+/* Success indicator */
+.success-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(52, 199, 89, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    animation: fadeOut 1.5s forwards;
+}
+
+.success-indicator::before {
+    content: '✓';
+    font-size: 48px;
+    color: white;
+    animation: scaleIn 0.5s ease-out;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; visibility: hidden; }
+}
+
+@keyframes scaleIn {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
 }
 
 /* Target item display */
@@ -346,111 +416,49 @@ main {
 }
 
 /* Camera Container */
-.camera-container {
-    position: relative;
+#webcam {
     width: 100%;
-    padding-top: 75%;
-    background-color: #000;
-    border-radius: 10px;
-    overflow: hidden;
-    animation: cameraBorder 2s infinite;
+    max-width: 640px;
+    border-radius: 12px;
+    margin: 20px auto;
 }
 
-#webcam {
-    position: absolute;
-    top: 0;
-    left: 0;
+.player-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.camera-overlay {
+.player-info {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.3);
-}
-
-/* Scanning Effect */
-.scanning-indicator::before {
-    content: '';
-    position: absolute;
-    top: 0;
+    bottom: 0;
     left: 0;
     right: 0;
-    height: 100%;
-    animation: scan 2s linear infinite;
-    pointer-events: none;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-/* Success Indicator */
-.success-indicator {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 4rem;
-    color: #2ecc71;
-    opacity: 0;
-    pointer-events: none;
+.player-name {
+    color: #fff;
+    font-size: 0.9rem;
+    margin: 0;
 }
 
-.success-indicator.show {
-    animation: success 0.5s ease-out forwards;
+.player-stats {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-/* Loading Spinner */
-.loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-top: 4px solid #4a90e2;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+.player-score {
+    color: #4CAF50;
 }
 
-/* Item Display */
-.item-display {
-    transition: all 0.3s ease;
-}
-
-.item-display.found {
-    animation: itemFound 1s ease-out;
-    color: #2ecc71;
-}
-
-/* Score Updates */
-.score-update {
-    position: absolute;
-    color: #2ecc71;
-    font-weight: bold;
-    pointer-events: none;
-    animation: scoreIncrement 1s ease-out forwards;
-}
-
-/* Player Entry Hover */
-.player-entry {
-    transition: all 0.3s ease;
-}
-
-.player-entry:hover {
-    border-color: #323232;
-    box-shadow: 
-        0 0 10px rgba(32, 32, 32, 0.5),
-        0 0 20px rgba(32, 32, 32, 0.3);
-    background: rgba(32, 32, 32, 0.9);
-    transform: scale(1.02);
-}
-
-/* Button Hover Effects */
-.primary-button:hover {
-    animation: buttonHover 1s infinite;
+.player-streak {
+    color: #FFC107;
 }
 
 /* Round Progress */

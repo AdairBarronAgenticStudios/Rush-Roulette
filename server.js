@@ -397,23 +397,47 @@ function startGame(roomId) {
 
 function startRound(roomId) {
     const room = gameRooms.get(roomId);
-    if (!room) return;
+    if (!room || !room.isActive) return;
 
-    // Set up round
     room.roundStartTime = Date.now();
-    room.targetItem = getRandomItem(DIFFICULTIES[room.currentRound - 1]);
+    room.roundSubmissions = new Set(); // Reset submissions for the new round
+
+    // Select item based on round number
+    let itemDifficulty = DIFFICULTIES[room.currentRound - 1] || DIFFICULTIES[DIFFICULTIES.length - 1];
+    
+    // Force 'tennis ball' for round 1
+    if (room.currentRound === 1) {
+        room.targetItem = 'tennis ball'; 
+    } else {
+        const item = getRandomItem(itemDifficulty);
+        // Ensure targetItem is a string, not an object
+        room.targetItem = typeof item === 'string' ? item : (item.name || 'unknown item');
+        console.log('Item selected:', item, 'Stored as:', room.targetItem);
+    }
+
+    console.log(`Room ${roomId} starting Round ${room.currentRound}. Target: ${room.targetItem}`);
 
     // Notify players
     io.to(roomId).emit('roundStarted', {
         round: room.currentRound,
-        targetItem: room.targetItem.name,
+        targetItem: room.targetItem,
         duration: ROUND_DURATION
     });
 
-    // Set round timer
+    // Clear previous timer if exists
+    if (room.roundTimer) {
+        clearTimeout(room.roundTimer);
+    }
+
+    // Set timer for round end
     room.roundTimer = setTimeout(() => {
         endRound(roomId);
     }, ROUND_DURATION);
+
+    // Reset submission locks for the room
+    room.players.forEach(player => {
+        submissionLocks.delete(`${roomId}-${player.id}-${room.targetItem}`);
+    });
 }
 
 function endRound(roomId) {

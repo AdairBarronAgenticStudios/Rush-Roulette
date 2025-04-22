@@ -42,17 +42,54 @@ class ItemScanner {
 
     async processFrame(videoElement) {
         if (!this.isModelLoaded || !videoElement) {
+            console.error('Scanner not initialized or video element missing', {
+                isModelLoaded: this.isModelLoaded,
+                videoElementExists: !!videoElement
+            });
             throw new Error('Scanner not initialized or video element missing');
         }
 
+        if (videoElement.readyState < 2) { // HAVE_CURRENT_DATA or better
+            console.warn('Video element not ready for frame processing, readyState:', videoElement.readyState);
+            return { 
+                success: false, 
+                message: 'Video not ready for processing',
+                readyState: videoElement.readyState
+            };
+        }
+
         try {
+            console.log('Processing frame with dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+            
+            // Check if the video has valid dimensions
+            if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+                console.warn('Video has invalid dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                return {
+                    success: false,
+                    message: 'Invalid video dimensions'
+                };
+            }
+            
             // Get more predictions for better accuracy
-            const predictions = await this.model.classify(videoElement, 10);
+            const predictions = await this.model.classify(videoElement, 15); // Increased to top 15 predictions
             console.log('Raw predictions:', predictions); // Debug log
+            
+            if (!predictions || predictions.length === 0) {
+                console.warn('No predictions returned from model');
+                return {
+                    success: false,
+                    message: 'No predictions available'
+                };
+            }
+            
             return this.verifyItem(predictions);
         } catch (error) {
             console.error('Error processing frame:', error);
-            throw error;
+            return {
+                success: false,
+                message: 'Error processing image. Please try again.',
+                error: error.message
+            };
         }
     }
 
@@ -91,10 +128,36 @@ class ItemScanner {
     compareItems(predictedItem, targetItem) {
         // Convert both to lowercase for comparison
         const predicted = predictedItem.toLowerCase();
-        const target = typeof targetItem === 'string' ? targetItem.toLowerCase() : targetItem.name.toLowerCase();
+        const target = typeof targetItem === 'string' ? targetItem.toLowerCase() : targetItem.name?.toLowerCase() || '';
 
         // Debug log
         console.log(`Comparing: ${predicted} with target: ${target}`);
+
+        // Tennis ball specific checks - expanded detection for the most common first item
+        if (target === 'tennis ball') {
+            const tennisBallKeywords = [
+                'tennis ball', 'ball', 'tennis', 'sports ball', 'yellow ball', 
+                'sphere', 'yellow sphere', 'yellow', 'sport', 'racket ball',
+                'toy ball', 'playing ball', 'game ball', 'green ball'
+            ];
+            
+            // Check for any tennis ball related keywords
+            for (const keyword of tennisBallKeywords) {
+                if (predicted.includes(keyword)) {
+                    console.log(`Tennis ball match found with keyword: ${keyword}`);
+                    return { isMatch: true, confidence: 0.8 };
+                }
+            }
+            
+            // Color and shape based detections for tennis balls
+            if (
+                (predicted.includes('yellow') && (predicted.includes('round') || predicted.includes('sphere') || predicted.includes('ball'))) ||
+                (predicted.includes('green') && (predicted.includes('round') || predicted.includes('sphere') || predicted.includes('ball')))
+            ) {
+                console.log(`Tennis ball match found with color and shape combination`);
+                return { isMatch: true, confidence: 0.8 };
+            }
+        }
 
         // Special handling for books
         if (target === 'book') {
@@ -191,7 +254,8 @@ const gameState = {
         roundTimes: [],
         maxStreak: 0,
         currentStreak: 0
-    }
+    },
+    roundStartTime: null
 };
 
 // DOM Elements
@@ -489,69 +553,188 @@ function createPlayerContainer() {
 function startRound(data) {
     gameState.currentRound = data.round;
     gameState.targetItem = data.targetItem;
+    gameState.scanner.setTargetItem(gameState.targetItem);
+    gameState.roundStartTime = Date.now();
     
     // Play round start sound
     gameState.audio.playSound('roundStart');
     
     // Update UI with animations
-    currentRoundDisplay.textContent = gameState.currentRound;
+    const currentRoundDisplay = document.getElementById('current-round');
+    if (currentRoundDisplay) {
+        currentRoundDisplay.textContent = gameState.currentRound;
+    } else {
+        console.warn("Element with ID 'current-round' not found.");
+    }
     
     const itemDisplay = document.getElementById('target-item');
-    itemDisplay.classList.add('fade-enter');
-    itemDisplay.textContent = gameState.targetItem;
-    setTimeout(() => {
-        itemDisplay.classList.remove('fade-enter');
-    }, 300);
+    if (itemDisplay) {
+        itemDisplay.classList.add('fade-enter');
+        itemDisplay.textContent = gameState.targetItem;
+        setTimeout(() => {
+            itemDisplay.classList.remove('fade-enter');
+        }, 300);
+    } else {
+        console.warn("Element with ID 'target-item' not found.");
+    }
     
-    // Add round progress bar
-    const progressBar = document.createElement('div');
-    progressBar.className = 'round-progress';
-    progressBar.innerHTML = '<div class="round-progress-bar"></div>';
-    document.querySelector('.game-header').appendChild(progressBar);
+    // Add round progress bar if header exists
+    const gameHeader = document.querySelector('.game-header'); // Assuming game-header exists
+    if (gameHeader) {
+        // Remove old progress bar if it exists
+        const oldProgressBar = gameHeader.querySelector('.round-progress');
+        if (oldProgressBar) oldProgressBar.remove();
+        // Add new progress bar
+        const progressBar = document.createElement('div');
+        progressBar.className = 'round-progress';
+        progressBar.innerHTML = '<div class="round-progress-bar"></div>';
+        gameHeader.appendChild(progressBar);
+    } else {
+        console.warn("Element with class 'game-header' not found.");
+    }
     
-    // Start webcam scanning with visual feedback
+    // Start webcam scanning using the player's video element
     startWebcamScanning();
 }
 
 async function startWebcamScanning() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        webcam.srcObject = stream;
-        
-        // Start periodic scanning
-        setInterval(async () => {
-            if (gameState.isGameActive) {
-                const result = await gameState.scanner.verifyItem(webcam);
-                if (result.success) {
-                    submitItem();
-                }
-            }
-        }, 1000);
-    } catch (error) {
-        console.error('Error accessing webcam:', error);
-        showError('Please allow camera access to play the game.');
+    // Find the video element associated with the local player
+    const localPlayerVideoElement = document.getElementById(`video-${gameState.socket?.id}`);
+
+    if (!localPlayerVideoElement) {
+        console.error("Local player video element not found for scanning.");
+        showError("Could not start camera scanning - video element not found.");
+        return;
     }
+
+    if (!gameState.localStream || !gameState.localStream.active) {
+        console.warn("Local stream not ready for scanning. Attempting initialization again.");
+        try {
+            // Try initializing again, might have failed silently before
+            await initializeLocalWebcam(localPlayerVideoElement);
+            // Check again
+            if (!gameState.localStream || !gameState.localStream.active) {
+                console.error("Local stream failed to initialize for scanning.");
+                showError("Camera not ready for scanning. Please check camera permissions.");
+                return;
+            }
+        } catch (error) {
+            console.error("Error initializing webcam:", error);
+            showError("Failed to access camera. Please check permissions and try again.");
+            return;
+        }
+    }
+    
+    // Ensure the stream is correctly assigned (might be redundant but safe)
+    if (localPlayerVideoElement.srcObject !== gameState.localStream) {
+        localPlayerVideoElement.srcObject = gameState.localStream;
+    }
+
+    // Make sure the model is loaded
+    if (!gameState.scanner.isModelLoaded) {
+        console.log("AI model not loaded yet, attempting to initialize scanner again...");
+        try {
+            await gameState.scanner.initialize();
+        } catch (error) {
+            console.error("Failed to initialize scanner:", error);
+            showError("Failed to load AI scanner. Please refresh the page.");
+            return;
+        }
+    }
+
+    console.log("Starting scanning loop with target item:", gameState.targetItem);
+    gameState.scanner.setTargetItem(gameState.targetItem);
+    
+    // Clear previous interval if it exists
+    if (gameState.scanIntervalId) {
+        clearInterval(gameState.scanIntervalId);
+    }
+    
+    // Start periodic scanning using the correct video element
+    gameState.scanIntervalId = setInterval(async () => {
+        if (gameState.isGameActive && gameState.scanner.isModelLoaded) { // Check model loaded
+            try {
+                // Make sure video is playing and ready
+                if (localPlayerVideoElement.readyState >= 2) { // HAVE_CURRENT_DATA or better
+                    const result = await gameState.scanner.processFrame(localPlayerVideoElement);
+                    console.log("Scan result:", result); // Log scan result
+                    
+                    if (result.success) {
+                        console.log("Item found! Submitting...");
+                        clearInterval(gameState.scanIntervalId); // Stop scanning temporarily
+                        gameState.isScanning = false;
+                        
+                        await submitItem(result);
+                        
+                        // Restart scanning after a delay
+                        setTimeout(() => {
+                            if (gameState.isGameActive) {
+                                startWebcamScanning();
+                            }
+                        }, 3000);
+                    } else if (result.message && result.message !== 'Item not found or confidence too low') {
+                        // If there's a specific error (not just "item not found")
+                        console.warn("Scanning issue:", result.message);
+                        // Show error for specific technical issues
+                        if (result.message.includes('Video not ready') || 
+                            result.message.includes('Invalid video dimensions')) {
+                            showError(result.message);
+                        }
+                    }
+                } else {
+                    console.log("Scanning paused: Video not ready. ReadyState:", localPlayerVideoElement.readyState);
+                }
+            } catch (error) {
+                console.error('Error during scanning interval:', error);
+                showError("Error during scanning. Retrying...");
+            }
+        } else {
+            // Stop scanning if game is no longer active or scanner not ready
+            console.log("Stopping scanning loop (Game inactive or scanner not loaded).");
+            clearInterval(gameState.scanIntervalId);
+            gameState.scanIntervalId = null;
+        }
+    }, 1000); // Scanning interval of 1 second
+
+    gameState.isScanning = true;
 }
 
-async function submitItem() {
+async function submitItem(scanResult) {
     if (!gameState.isGameActive) return;
 
     try {
         // Add loading state
         const cameraContainer = document.querySelector('.camera-container');
-        cameraContainer.classList.add('loading');
+        if (cameraContainer) {
+            cameraContainer.classList.add('loading');
+        }
 
         // Play scanning sound
-        gameState.audio.playSound('scan');
+        if (gameState.audio && gameState.audio.isInitialized) {
+            gameState.audio.playSound('scan');
+        }
 
-        // Generate image hash and metadata
-        const imageHash = await gameState.imageHasher.generateHash(webcam);
-        const metadata = gameState.imageHasher.getMetadata(webcam);
+        // Generate image hash and metadata if available
+        let imageHash = null;
+        let metadata = null;
+        
+        try {
+            const videoElement = document.getElementById(`video-${gameState.socket?.id}`);
+            if (gameState.imageHasher && videoElement) {
+                imageHash = await gameState.imageHasher.generateHash(videoElement);
+                metadata = gameState.imageHasher.getMetadata(videoElement);
+            }
+        } catch (hashError) {
+            console.warn('Could not generate image hash:', hashError);
+            // Continue without the hash
+        }
 
-        // Submit to server with security data
+        // Submit to server with all available data
         gameState.socket.emit('submitItem', {
             item: gameState.targetItem,
             timestamp: Date.now(),
+            prediction: scanResult?.prediction || null,
+            confidence: scanResult?.confidence || null,
             imageHash,
             metadata
         });
@@ -561,10 +744,22 @@ async function submitItem() {
     } catch (error) {
         console.error('Error submitting item:', error);
         showError('Failed to process image. Please try again.');
-        gameState.audio.playSound('error');
+        if (gameState.audio && gameState.audio.isInitialized) {
+            gameState.audio.playSound('error');
+        }
+        
+        // Restart scanning after error
+        setTimeout(() => {
+            if (gameState.isGameActive && !gameState.isScanning) {
+                startWebcamScanning();
+            }
+        }, 2000);
     } finally {
         // Remove loading state
-        document.querySelector('.camera-container').classList.remove('loading');
+        const cameraContainer = document.querySelector('.camera-container');
+        if (cameraContainer) {
+            cameraContainer.classList.remove('loading');
+        }
     }
 }
 
@@ -575,37 +770,137 @@ function updateCountdown(count) {
 function updatePlayerList(data) {
     console.log('Updating player list:', data);
     
-    // Find an empty player slot
-    const emptySlot = document.querySelector('.player-video.empty');
-    if (!emptySlot) {
-        console.warn('No empty slots available for new player');
+    // Find the player slot by data-position if available, otherwise find first empty
+    const position = data.position !== undefined ? data.position : findEmptySlotPosition();
+    const playerSlot = document.querySelector(`.player-video[data-position="${position}"]`);
+
+    if (!playerSlot) {
+        console.warn(`No player slot found for position ${position}`);
         return;
     }
 
+    // Update player data in game state
+    const playerData = {
+        id: data.playerId,
+        name: data.playerName,
+        position: position,
+        element: playerSlot,
+        score: data.score || 0,
+        streak: data.streak || 0
+    };
+    gameState.players[data.playerId] = playerData; // Store by player ID
+
     // Remove empty class and update content
-    emptySlot.classList.remove('empty');
-    emptySlot.innerHTML = `
-        <video autoplay playsinline></video>
-        <div class="player-info">
-            <div class="player-name">${data.playerName}</div>
-            <div class="player-stats">
-                <span class="score">0</span>
-                <span class="streak"></span>
+    playerSlot.classList.remove('empty');
+    playerSlot.innerHTML = `
+        <div class="camera-container">
+            <video id="video-${data.playerId}" autoplay playsinline muted></video>
+            <div class="player-info">
+                <div class="player-name">${data.playerName}</div>
+                <div class="player-stats">
+                    <span class="score">${playerData.score}</span>
+                    <span class="streak">${playerData.streak > 1 ? '🔥'+playerData.streak+'x' : ''}</span>
+                </div>
             </div>
         </div>
     `;
 
-    // Store player data
-    const position = emptySlot.dataset.position;
-    gameState.players[position] = {
-        id: data.playerId,
-        name: data.playerName,
-        element: emptySlot
-    };
-
+    // If this is the local player joining, initialize their webcam
+    if (data.playerId === gameState.socket?.id) {
+        initializeLocalWebcam(playerSlot.querySelector('video'));
+    } else {
+        // For other players, we need to request/receive their stream (handled by socket listeners)
+        console.log(`Requesting video for player ${data.playerId} in slot ${position}`);
+        // The server should send the stream based on room logic
+    }
+    
     // Show waiting message if not enough players
-    if (data.currentPlayers.length < MIN_PLAYERS) {
-        showMessage(`Waiting for players... (${data.currentPlayers.length}/${MIN_PLAYERS} needed)`);
+    const currentPlayersCount = Object.keys(gameState.players).length;
+    if (currentPlayersCount < MIN_PLAYERS) {
+        showMessage(`Waiting for players... (${currentPlayersCount}/${MIN_PLAYERS} needed)`);
+    }
+}
+
+// Helper to find the first available empty slot position
+function findEmptySlotPosition() {
+    for (let i = 0; i < gameState.maxPlayers; i++) {
+        const slot = document.querySelector(`.player-video[data-position="${i}"]`);
+        if (slot && slot.classList.contains('empty')) {
+            return i;
+        }
+    }
+    return -1; // No empty slot found
+}
+
+// Initialize the local player's webcam and attach to their video element
+async function initializeLocalWebcam(videoElement) {
+    if (!videoElement) {
+        console.error("Video element not provided for webcam initialization");
+        return false;
+    }
+    
+    console.log("Initializing local webcam...");
+    
+    // Check if we already have a stream and it's still active
+    if (gameState.localStream && gameState.localStream.active) {
+        console.log("Using existing webcam stream");
+        videoElement.srcObject = gameState.localStream;
+        return true;
+    }
+    
+    try {
+        // Get user media with constraints
+        const constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: "user"
+            },
+            audio: false
+        };
+        
+        console.log("Requesting webcam access...");
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Store stream globally and assign to video element
+        gameState.localStream = stream;
+        videoElement.srcObject = stream;
+        
+        // Wait for video to be ready
+        await new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+                console.log("Video metadata loaded, dimensions:", videoElement.videoWidth, "x", videoElement.videoHeight);
+                resolve();
+            };
+            // Add a timeout in case onloadedmetadata doesn't fire
+            setTimeout(resolve, 1000);
+        });
+        
+        // Make sure video is playing
+        try {
+            await videoElement.play();
+            console.log("Video started playing successfully");
+        } catch (playError) {
+            console.error("Error playing video:", playError);
+            // Continue anyway, as some browsers might still work
+        }
+        
+        return true;
+    } catch (error) {
+        console.error("Error accessing webcam:", error);
+        
+        // Show specific error message based on error type
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+            showError("Camera access denied. Please allow camera access in your browser settings.");
+        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+            showError("No camera found. Please connect a camera and try again.");
+        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+            showError("Camera is in use by another application. Please close other applications using your camera.");
+        } else {
+            showError("Error accessing camera: " + error.message);
+        }
+        
+        return false;
     }
 }
 
@@ -666,39 +961,68 @@ function updatePlayerScore(data) {
 }
 
 function showSuccessIndicator() {
-    const indicator = document.createElement('div');
-    indicator.className = 'success-indicator';
-    indicator.textContent = '✓';
+    // Play success sound
+    if (gameState.audio && gameState.audio.isInitialized) {
+        gameState.audio.playSound('success');
+    }
     
-    const cameraContainer = document.querySelector('.camera-container');
-    cameraContainer.appendChild(indicator);
-    
-    setTimeout(() => {
-        indicator.classList.add('show');
-        setTimeout(() => {
-            indicator.classList.remove('show');
+    // Show visual indicator on the player's video
+    const localPlayerId = gameState.socket?.id;
+    if (localPlayerId) {
+        const playerContainer = document.querySelector(`.player-video[data-position="${gameState.players[localPlayerId]?.position}"] .camera-container`);
+        if (playerContainer) {
+            // Create success indicator element
+            const successIndicator = document.createElement('div');
+            successIndicator.className = 'success-indicator';
+            playerContainer.appendChild(successIndicator);
+            
+            // Remove after animation completes
             setTimeout(() => {
-                indicator.remove();
-            }, 300);
-        }, 1000);
-    }, 10);
+                if (successIndicator.parentNode) {
+                    successIndicator.remove();
+                }
+            }, 2000);
+        }
+    }
+    
+    // Update player UI to show success
+    updatePlayerScore({
+        playerId: localPlayerId,
+        score: gameState.players[localPlayerId]?.score || 0,
+        streak: gameState.players[localPlayerId]?.streak || 0
+    });
 }
 
 function endRound(data) {
+    console.log("Ending round, stopping scanning loop.");
+    // Stop scanning interval
+    if (gameState.scanIntervalId) {
+        clearInterval(gameState.scanIntervalId);
+        gameState.scanIntervalId = null;
+    }
+
     // Play round end sound
     gameState.audio.playSound('roundEnd');
 
-    // Stop webcam scanning
-    if (webcam.srcObject) {
-        webcam.srcObject.getTracks().forEach(track => track.stop());
-    }
+    // Stop webcam stream?
+    // Consider if the stream should stop or just the scanning
+    // if (gameState.localStream) {
+    //     gameState.localStream.getTracks().forEach(track => track.stop());
+    //     gameState.localStream = null; 
+    // }
     
     // Update player stats
     const currentPlayer = data.scores.find(score => score.playerId === gameState.socket.id);
     if (currentPlayer) {
+        // Ensure playerStats exists
+        if (!gameState.playerStats) {
+            gameState.playerStats = { roundScores: [], roundTimes: [], maxStreak: 0, currentStreak: 0 };
+        }
         gameState.playerStats.roundScores.push(currentPlayer.score);
-        gameState.playerStats.roundTimes.push(Date.now() - gameState.roundStartTime);
-        gameState.playerStats.maxStreak = Math.max(gameState.playerStats.maxStreak, gameState.playerStats.currentStreak);
+        // Make sure roundStartTime was recorded
+        const roundDuration = gameState.roundStartTime ? (Date.now() - gameState.roundStartTime) : 0;
+        gameState.playerStats.roundTimes.push(roundDuration);
+        gameState.playerStats.maxStreak = Math.max(gameState.playerStats.maxStreak || 0, gameState.playerStats.currentStreak || 0);
     }
 
     // Show round summary
@@ -816,26 +1140,52 @@ function getMedalEmoji(position) {
     return medals[position] || '';
 }
 
-function showError(message) {
-    const errorPopup = document.createElement('div');
-    errorPopup.className = 'error-popup';
-    errorPopup.textContent = message;
+function showError(message, duration = 3000) {
+    console.error(message);
     
-    document.body.appendChild(errorPopup);
+    // Add as a general message
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'error-message';
+    errorMsg.textContent = message;
+    document.body.appendChild(errorMsg);
     
-    // Add error shake animation
-    errorPopup.classList.add('error');
-    
-    // Trigger show animation
-    setTimeout(() => {
-        errorPopup.classList.add('show');
-        setTimeout(() => {
-            errorPopup.classList.remove('show');
+    // Also add directly to the player's video container if it exists
+    const localPlayerId = gameState.socket?.id;
+    if (localPlayerId) {
+        const playerContainer = document.querySelector(`.player-video[data-position="${gameState.players[localPlayerId]?.position}"] .camera-container`);
+        if (playerContainer) {
+            // Remove any existing error messages
+            const existingError = playerContainer.querySelector('.processing-error');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            // Add new error message
+            const videoError = document.createElement('div');
+            videoError.className = 'processing-error';
+            videoError.textContent = message;
+            playerContainer.appendChild(videoError);
+            
+            // Remove after duration
             setTimeout(() => {
-                errorPopup.remove();
-            }, 300);
-        }, 3000);
-    }, 10);
+                if (videoError.parentNode) {
+                    videoError.remove();
+                }
+            }, duration);
+        }
+    }
+    
+    // Clean up general message after duration
+    setTimeout(() => {
+        if (errorMsg.parentNode) {
+            errorMsg.remove();
+        }
+    }, duration);
+    
+    // Play error sound if available
+    if (gameState.audio && gameState.audio.isInitialized) {
+        gameState.audio.playSound('error');
+    }
 }
 
 // Screen Management
@@ -931,9 +1281,18 @@ function setupGameEventHandlers() {
         console.log('Player joined:', data);
         updatePlayerList(data);
         
-        // Show waiting message if not enough players
-        if (data.currentPlayers.length < MIN_PLAYERS) {
-            showMessage(`Waiting for players... (${data.currentPlayers.length}/${MIN_PLAYERS} needed)`);
+        // Update with potentially more complete player list from server
+        if (data.allPlayers) {
+             Object.values(data.allPlayers).forEach(player => {
+                 if (!gameState.players[player.id]) { // Add players we might have missed
+                     updatePlayerList(player);
+                 }
+             });
+        }
+
+        const currentPlayersCount = Object.keys(gameState.players).length;
+        if (currentPlayersCount < MIN_PLAYERS) {
+            showMessage(`Waiting for players... (${currentPlayersCount}/${MIN_PLAYERS} needed)`);
         }
     });
 
@@ -980,9 +1339,42 @@ function setupGameEventHandlers() {
 
     gameState.socket.on('playerRejoined', (data) => {
         console.log('Player rejoined:', data);
+        // Re-add player to the list and potentially request stream
         updatePlayerList(data);
     });
+
+    // -------- ADD WEBRTC / VIDEO STREAM LISTENERS HERE --------
+    // Example (needs actual WebRTC implementation):
+    gameState.socket.on('videoOffer', handleVideoOffer); // From another peer
+    gameState.socket.on('videoAnswer', handleVideoAnswer); // From another peer
+    gameState.socket.on('newIceCandidate', handleNewIceCandidate); // From another peer
+    gameState.socket.on('allPlayers', setupPeerConnections); // From server, lists players to connect to
+    // -----------------------------------------------------------
 }
+
+// -------- ADD WEBRTC / VIDEO STREAM HANDLER FUNCTIONS HERE --------
+// Placeholder functions - These require a full WebRTC implementation
+function setupPeerConnections(players) {
+    console.log("Setting up peer connections for players:", players);
+    // For each player (except self), create a PeerConnection
+    // Send offers etc.
+}
+
+function handleVideoOffer(data) {
+    console.log("Received video offer from:", data.senderId);
+    // Create PeerConnection, set remote description, create answer, send answer
+}
+
+function handleVideoAnswer(data) {
+    console.log("Received video answer from:", data.senderId);
+    // Set remote description
+}
+
+function handleNewIceCandidate(data) {
+    console.log("Received ICE candidate from:", data.senderId);
+    // Add ICE candidate to the corresponding PeerConnection
+}
+// -----------------------------------------------------------------
 
 // Add helper function to show messages
 function showMessage(message) {
