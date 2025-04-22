@@ -66,41 +66,40 @@ main {
 
 /* Screen Transitions */
 .screen {
-    display: none;
+    display: none; /* Hide inactive screens completely */
     width: 100%;
-    height: 100vh;
-    position: absolute;
+    height: 100vh; /* Use viewport height */
+    position: absolute; /* Use absolute positioning */
     top: 0;
     left: 0;
     opacity: 0;
-    transform: translateY(20px);
+    transition: opacity 0.5s ease-out; /* Only transition opacity */
+    pointer-events: none; /* Prevent clicks on inactive screens */
+    background-color: #1a1a1a; /* Default background for screens */
+    z-index: 1; /* Base z-index */
 }
 
 .screen.active {
-    display: block;
+    display: block; /* Show active screen */
+    opacity: 1;
+    pointer-events: auto; /* Allow clicks on active screen */
+    z-index: 10; /* Ensure active screen is on top */
     animation: fadeIn 0.5s ease-out forwards;
 }
 
 /* Home Screen Specific Styles */
 .home-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    display: flex;
+    /* Remove position, width, height, background, z-index, transition, opacity, transform */
+    /* These are now handled by .screen and .screen.active */
+    display: flex; /* Keep flex for centering content */
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-    z-index: 10;
-    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .home-screen.hidden {
-    opacity: 0;
-    transform: scale(1.1);
-    pointer-events: none;
+    /* Remove opacity, transform, pointer-events */
+    /* This class might no longer be needed if .screen/.active handles everything */
 }
 
 .home-screen h1 {
@@ -185,21 +184,12 @@ main {
 
 /* Game Screen Specific Styles */
 .game-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    background: #1a1a1a;
-    opacity: 0;
-    transform: scale(0.95);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    z-index: 5;
+    /* Remove position, top, left, width, height, background, opacity, transform, transition, z-index */
+    /* These are now handled by .screen and .screen.active */
 }
 
 .game-screen.active {
-    opacity: 1;
-    transform: scale(1);
+    /* Remove opacity and transform - handled by .screen.active */
 }
 
 .game-content {
@@ -1117,7 +1107,7 @@ footer {
 }
 
 .player-video:hover,
-.item-to-find:hover,
+/* .item-to-find:hover, */ /* Removed to prevent distracting hover effect on central item */
 .player-entry:hover {
     animation: darkNeonPulse 2s infinite;
 }
@@ -1197,4 +1187,9 @@ footer {
 .message-container.show {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 } 
