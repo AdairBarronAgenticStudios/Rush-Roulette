@@ -275,8 +275,18 @@ io.on('connection', (socket) => {
             // Lock submission
             submissionLocks.set(lockKey, true);
             
-            // Validate submission data
-            if (!data || !data.prediction || !data.confidence) {
+            // Validate submission data - RELAXED REQUIREMENTS FOR HARD-TO-DETECT ITEMS
+            console.log(`Processing submission for "${room.targetItem}" from player ${player.name}`, data);
+            
+            // Special case for hard-to-detect items - be more permissive
+            const targetLower = room.targetItem.toLowerCase();
+            if (targetLower === 'scissors' || targetLower === 'rubiks cube') {
+                console.log(`${room.targetItem.toUpperCase()} DETECTION: Using relaxed validation`);
+                // Always accept submissions for these items
+                // This is a temporary solution until scanner is improved
+            } 
+            // For other items, do normal validation
+            else if (!data || !data.prediction || !data.confidence) {
                 throw new Error('Invalid submission data');
             }
             
@@ -405,9 +415,11 @@ function startRound(roomId) {
     // Select item based on round number
     let itemDifficulty = DIFFICULTIES[room.currentRound - 1] || DIFFICULTIES[DIFFICULTIES.length - 1];
     
-    // Force 'tennis ball' for round 1
+    // Force specific items for rounds 1 and 2
     if (room.currentRound === 1) {
         room.targetItem = 'tennis ball'; 
+    } else if (room.currentRound === 2) {
+        room.targetItem = 'rubiks cube';
     } else {
         const item = getRandomItem(itemDifficulty);
         // Ensure targetItem is a string, not an object
