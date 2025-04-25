@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rush Roulette - Game</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- TensorFlow.js and MobileNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1"></script>
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Main App -->
+    <script type="module" src="game.js"></script>
+</head>
+<body>
+    <header>
+        <h1><span class="rush">Rush</span> <span class="roulette">Roulette</span></h1>
+    </header>
+
+    <main>
+        <div id="game-container">
+            <!-- Game Screen -->
+            <div id="game-screen" class="screen active">
+                <div class="game-content">
+                    <!-- Top row -->
+                    <div class="player-video empty" data-position="0">
+                        <span>...</span>
+                    </div>
+                    <div class="player-video empty" data-position="1">
+                        <span>...</span>
+                    </div>
+                    <div class="player-video empty" data-position="2">
+                        <span>...</span>
+                    </div>
+
+                    <!-- Middle row -->
+                    <div class="player-video empty" data-position="3">
+                        <span>...</span>
+                    </div>
+                    <div class="item-to-find">
+                        <h3>Find:</h3>
+                        <div id="target-item" class="item-display"></div>
+                    </div>
+                    <div class="player-video empty" data-position="4">
+                        <span>...</span>
+                    </div>
+
+                    <!-- Bottom row -->
+                    <div class="player-video empty" data-position="5">
+                        <span>...</span>
+                    </div>
+                    <div class="player-video empty" data-position="6">
+                        <span>...</span>
+                    </div>
+                    <div class="player-video empty" data-position="7">
+                        <span>...</span>
+                    </div>
+                </div>
+
+                <div class="leaderboard">
+                    <div id="player-list" class="player-list"></div>
+                </div>
+            </div>
+
+            <!-- Round Summary Screen -->
+            <div id="round-summary" class="screen">
+                <h2>Round <span id="round-number">1</span> Complete!</h2>
+                <div class="round-stats">
+                    <div class="completion-time">
+                        <h3>Your Time</h3>
+                        <div id="player-time">0:00</div>
+                    </div>
+                    <div class="round-score">
+                        <h3>Round Score</h3>
+                        <div id="round-points">0</div>
+                    </div>
+                </div>
+                
+                <div class="round-rankings">
+                    <h3>Round Rankings</h3>
+                    <div id="round-leaderboard" class="rankings-list">
+                        <!-- Round rankings will be added here dynamically -->
+                    </div>
+                </div>
+
+                <div class="next-round-info">
+                    <h3>Next Round</h3>
+                    <p>Get ready for <span id="next-round-difficulty">harder</span> items!</p>
+                    <div id="next-round-countdown" class="countdown">5</div>
+                </div>
+            </div>
+
+            <!-- Game Summary Screen -->
+            <div id="game-summary" class="screen">
+                <h2>Game Complete!</h2>
+                
+                <div class="final-standings">
+                    <h3>Final Standings</h3>
+                    <div id="final-leaderboard" class="rankings-list">
+                        <!-- Final rankings will be added here dynamically -->
+                    </div>
+                </div>
+
+                <div class="player-stats-summary">
+                    <h3>Your Performance</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Score</span>
+                            <span id="total-score" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Best Round</span>
+                            <span id="best-round" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Longest Streak</span>
+                            <span id="max-streak" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Average Time</span>
+                            <span id="avg-time" class="stat-value">0:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="return-home" class="primary-button">Return to Home</button>
+                <button id="play-again" class="primary-button">Play Again</button>
+            </div>
+
+            <!-- Error Screen -->
+            <div id="error-screen" class="screen">
+                <!-- Error content will be added dynamically -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2024 Rush Roulette</p>
+    </footer>
+</body>
+</html> 

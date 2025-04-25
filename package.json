@@ -12,6 +12,7 @@
     "@tensorflow-models/mobilenet": "^2.1.0",
     "@tensorflow/tfjs": "^4.17.0",
     "express": "^4.21.2",
+    "firebase": "^11.6.1",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
