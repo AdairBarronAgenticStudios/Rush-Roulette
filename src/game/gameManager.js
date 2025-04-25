@@ -11,7 +11,7 @@ class GameManager {
     this.roundDuration = 60000; // 60 seconds per round
     this.timeBetweenRounds = 10000; // 10 seconds between rounds
     this.maxRounds = 5;
-    this.minPlayers = 2;
+    this.minPlayers = 1;
   }
 
   /**

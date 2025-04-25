@@ -40,7 +40,7 @@ const rateLimiter = new RateLimiter();
 // Game Constants
 const ROUND_DURATION = 60000; // 60 seconds per round
 const MAX_PLAYERS = 8;
-const MIN_PLAYERS = 2;
+const MIN_PLAYERS = 1;
 const ROUNDS_PER_GAME = 3;
 const DIFFICULTIES = ['common', 'specific', 'rare'];
 const ROOM_CLEANUP_INTERVAL = 300000; // 5 minutes

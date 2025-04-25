@@ -1,5 +1,5 @@
 // Game Constants
-const MIN_PLAYERS = 2;
+const MIN_PLAYERS = 1;
 const MAX_PLAYERS = 8;
 const ROUNDS_PER_GAME = 3;
 const ROUND_DURATION = 60000; // 60 seconds
