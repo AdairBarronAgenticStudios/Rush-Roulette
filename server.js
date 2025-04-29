@@ -271,6 +271,15 @@ io.on('connection', (socket) => {
             return;
         }
         
+        // Check if player already submitted a correct item this round
+        if (room.roundSubmissions && room.roundSubmissions.has(socket.id)) {
+            socket.emit('error', {
+                type: 'already_submitted',
+                message: 'You have already submitted a correct item for this round.'
+            });
+            return;
+        }
+        
         try {
             // Lock submission
             submissionLocks.set(lockKey, true);
@@ -301,6 +310,9 @@ io.on('connection', (socket) => {
             player.roundScores[room.currentRound - 1] = score;
             player.lastActivity = Date.now();
             room.lastActivity = Date.now();
+            
+            // Mark this player as having submitted for this round
+            if (room.roundSubmissions) room.roundSubmissions.add(socket.id);
             
             // Notify all players
             io.to(roomId).emit('itemVerified', {

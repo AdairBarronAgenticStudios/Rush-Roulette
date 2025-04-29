@@ -827,13 +827,6 @@ async function startWebcamScanning() {
                                 
                                 await submitItem(enhancedResult);
                                 
-                                // Restart scanning after a delay
-                                setTimeout(() => {
-                                    if (gameState.isGameActive) {
-                                        startWebcamScanning();
-                                    }
-                                }, 3000);
-                                
                                 return;
                             }
                         }
@@ -847,12 +840,7 @@ async function startWebcamScanning() {
                         
                         await submitItem(result);
                         
-                        // Restart scanning after a delay
-                        setTimeout(() => {
-                            if (gameState.isGameActive) {
-                                startWebcamScanning();
-                            }
-                        }, 3000);
+                        return;
                     } else if (result.message && result.message !== 'Item not found or confidence too low') {
                         // If there's a specific error (not just "item not found")
                         console.warn("Scanning issue:", result.message);
@@ -1131,7 +1119,7 @@ function updatePlayerScore(data) {
         const playerElement = gameState.players[position].element;
         
         // Play score sounds
-        if (data.score.total > 150) {
+        if (data.score > 150) {
             gameState.audio.playSound('streak', { volume: 0.7 });
         } else {
             gameState.audio.playSound('point');
@@ -1140,7 +1128,7 @@ function updatePlayerScore(data) {
         // Create score increment animation
         const scoreIncrement = document.createElement('div');
         scoreIncrement.className = 'score-update';
-        scoreIncrement.textContent = `+${data.score.total}`;
+        scoreIncrement.textContent = `+${data.score}`;
         playerElement.appendChild(scoreIncrement);
 
         // Update player name with score and streak
@@ -1154,7 +1142,7 @@ function updatePlayerScore(data) {
         `;
 
         // Add celebration effect if it's a high score
-        if (data.score.total > 150) {
+        if (data.score > 150) {
             playerElement.classList.add('celebration');
             setTimeout(() => {
                 playerElement.classList.remove('celebration');
